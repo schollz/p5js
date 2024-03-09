@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Your Sketch</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+</head>
+
+<body>
+    <script>
+        let sound, fft;
+        const wave = [];
+        let spacing = 30;
+        let cycles = 4;
+        let phasing = 780;
+        let waves = 12;
+
+        function preload() {
+            sound = loadSound('sample.wav'); // Make sure this path is correct
+        }
+
+        function setup() {
+            createCanvas(1200, 400); // Increased height for better visualization
+            sound.amp(0); // Do not play the sound
+            fft = new p5.FFT(0.01, 256); // Adjust for desired smoothness and bin size
+            sound.loop();
+            noLoop(); // We only want to draw once
+        }
+
+        function draw() {
+            background(255);
+            let waveform = fft.waveform(); // Analyze the waveform
+            // We only perform the Fourier analysis once, and only if the waveform array is not empty and fourierY is undefined
+            if (!window.fourierY && waveform.length > 0) {
+                window.fourierY = dft(waveform);
+                window.fourierY.sort((a, b) => b.amp - a.amp); // Sort by amplitude
+            }
+
+            if (!window.fourierY) {
+                return; // Exit if fourierY has not been set
+            }
+
+
+            let x = 0;
+            let baseY = spacing * 4; // Starting y position for drawing waves
+            for (let i = 1; i < waves; i++) {
+                let freqVal = window.fourierY[i].freq;
+                // plot smooth sine wave 
+                beginShape();
+                noFill();
+                strokeWeight(4);
+                for (let x = 0; x < width; x += 0.1) {
+                    let y = 30 + baseY + spacing * i + 8 * sin(TWO_PI * freqVal * (x + phasing) / width / cycles);
+                    vertex(x, y);
+                }
+                endShape();
+
+            }
+
+            // now plot the sum 
+            beginShape();
+            noFill();
+            strokeWeight(4);
+            for (let x = 0; x < width; x += 0.1) {
+                let y = spacing * 3;
+                for (let i = 1; i < waves; i++) {
+                    y += 10 * sin(TWO_PI * window.fourierY[i].freq * (x + phasing) / width / cycles + phasing * TWO_PI / waves);
+                }
+                vertex(x, y);
+            }
+            endShape();
+
+        }
+
+        function dft(x) {
+            let X = [];
+            const N = x.length;
+            for (let k = 0; k < N; k++) {
+                let sum = new p5.Vector(0, 0); // We use p5.Vector to handle complex numbers
+                for (let n = 0; n < N; n++) {
+                    const phi = (TWO_PI * k * n) / N;
+                    const c = new p5.Vector(cos(phi), -sin(phi));
+                    sum.add(p5.Vector.mult(new p5.Vector(x[n], 0), c));
+                }
+                sum.div(N);
+                let freq = k;
+                let amp = sum.mag();
+                let phase = atan2(sum.y, sum.x);
+                X.push({ re: sum.x, im: sum.y, freq, amp, phase }); // Use push to add to array
+            }
+            return X;
+        }
+    </script>
+</body>
+
+</html>
